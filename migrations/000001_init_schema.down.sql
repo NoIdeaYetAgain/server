@@ -1,0 +1,5 @@
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS properties;
+DROP TABLE IF EXISTS inspection_requests;
+DROP TABLE IF EXISTS reviews;
+DROP TABLE IF EXISTS favorites;
