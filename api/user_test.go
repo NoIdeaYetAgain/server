@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-// mockStore implements the minimal db.Store interface needed for testing
+// mockStore implements the minimal db.SQLStore interface needed for testing
 type mockStore struct {
 	createUserFunc func(ctx context.Context, arg db.CreateUserParams) (db.User, error)
 	getUserFunc    func(ctx context.Context, id int32) (db.User, error)
@@ -39,8 +39,8 @@ func (m *mockStore) GetUser(ctx context.Context, id int32) (db.User, error) {
 	return db.User{}, errors.New("getUserFunc not implemented")
 }
 
-// Implement other required Store methods with empty implementations
-func (m *mockStore) BeginTx(ctx context.Context) (db.Store, error) {
+// Implement other required SQLStore methods with empty implementations
+func (m *mockStore) BeginTx(ctx context.Context) (db.SQLStore, error) {
 	return m, nil
 }
 
@@ -287,7 +287,7 @@ func requireBodyMatchUser(t *testing.T, body *bytes.Buffer, user db.User) {
 	require.Empty(t, gotUser.PasswordHash)
 }
 
-func newTestServer(t *testing.T, store db.Store) *Server {
+func newTestServer(t *testing.T, store db.SQLStore) *Server {
 	config := util.Config{
 		TokenSymmetricKey:   util.RandomString(32),
 		AccessTokenDuration: time.Minute,

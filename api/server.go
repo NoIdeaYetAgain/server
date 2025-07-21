@@ -11,13 +11,13 @@ import (
 
 type Server struct {
 	config          util.Config
-	store           *db.Store
+	store           *db.SQLStore
 	tokenMaker      token.Maker
 	router          *gin.Engine
 	taskDistributor worker.TaskDistributor
 }
 
-func NewServer(config util.Config, store *db.Store, taskDistributor worker.TaskDistributor) (*Server, error) {
+func NewServer(config util.Config, store *db.SQLStore, taskDistributor worker.TaskDistributor) (*Server, error) {
 	tokenMaker, err := token.NewPasetoMaker(config.TokenSymmetricKey)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create token maker: %w", err)

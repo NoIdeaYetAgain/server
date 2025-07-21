@@ -43,7 +43,7 @@ func main() {
 	}
 }
 
-func runTaskProcessor(redisOpt asynq.RedisClientOpt, store db.Store) {
+func runTaskProcessor(redisOpt asynq.RedisClientOpt, store db.SQLStore) {
 	taskProcessor := worker.NewRedisTaskProcessor(redisOpt, store)
 	log.Info().Msg("start task processor")
 	err := taskProcessor.Start()

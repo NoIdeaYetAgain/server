@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"net/http"
@@ -64,30 +65,34 @@ func (server *Server) createUser(ctx *gin.Context) {
 		return
 	}
 
-	arg := db.CreateUserParams{
-		FullName:     req.FullName,
-		Email:        req.Email,
-		PhoneNumber:  req.PhoneNumber,
-		PasswordHash: hashedPassword,
-		Role:         req.Role,
+	arg := db.CreateUserTxParams{
+		CreateUserParams: db.CreateUserParams{
+			FullName:     req.FullName,
+			Email:        req.Email,
+			PhoneNumber:  req.PhoneNumber,
+			PasswordHash: hashedPassword,
+			Role:         req.Role,
+		},
+		AfterCreate: func(user db.User) error {
+			taskPayload := &worker.PayloadSendVerifyEmail{
+				Email: user.Email,
+			}
+			opts := []asynq.Option{
+				asynq.MaxRetry(10),
+				asynq.ProcessIn(10 * time.Second),
+				asynq.Queue(worker.QueueCritical),
+			}
+			return server.taskDistributor.DistributeTaskSendVerifyEmail(ctx, taskPayload, opts...)
+		},
 	}
 
-	user, err := server.store.CreateUser(ctx, arg)
+	txResult, err := server.store.CreateUserTx(ctx, arg)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}
 
-	taskPayload := &worker.PayloadSendVerifyEmail{
-		Email: user.Email,
-	}
-	err = server.taskDistributor.DistributeTaskSendVerifyEmail(ctx, taskPayload)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-		return
-	}
-
-	rsp := newUserResponse(user)
+	rsp := newUserResponse(txResult.User)
 
 	ctx.JSON(http.StatusOK, rsp)
 }
