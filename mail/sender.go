@@ -31,7 +31,7 @@ type GmailSender struct {
 func NewGmailSender(name string, fromEmailAddress string, fromEmailPassword string) EmailSender {
 	return &GmailSender{
 		name:              name,
-		fromEmailAddress:  fromEmailPassword,
+		fromEmailAddress:  fromEmailAddress,
 		fromEmailPassword: fromEmailPassword,
 	}
 }

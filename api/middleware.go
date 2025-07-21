@@ -15,7 +15,7 @@ const (
 	authorizationPayloadKey = "authorization_payload"
 )
 
-func authMiddleware(tokenMaker token.Maker) gin.HandlerFunc {
+func authMiddleware(tokenMaker token.Maker, accessibleRoles []string) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		authorizationHeader := ctx.GetHeader(authorizationHeaderKey)
 		if len(authorizationHeader) == 0 {
@@ -45,7 +45,23 @@ func authMiddleware(tokenMaker token.Maker) gin.HandlerFunc {
 			return
 		}
 
+		if !hasPermission(payload.Role, accessibleRoles) {
+			err := fmt.Errorf("user role %s is not authorized to access this resource", payload.Role)
+			ctx.AbortWithStatusJSON(http.StatusForbidden, errorResponse(err))
+			return
+		}
+
 		ctx.Set(authorizationPayloadKey, payload)
 		ctx.Next()
 	}
+}
+
+func hasPermission(userRole string, accessibleRoles []string) bool {
+	for _, role := range accessibleRoles {
+		if userRole == role {
+			return true
+		}
+
+	}
+	return false
 }

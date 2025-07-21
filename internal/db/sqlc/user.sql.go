@@ -15,7 +15,7 @@ INSERT INTO users (
 ) VALUES (
              $1, $2, $3, $4, $5
          )
-    RETURNING id, full_name, email, phone_number, password_hash, role, created_at, updated_at
+    RETURNING id, full_name, email, phone_number, password_hash, role, is_email_verified, created_at, updated_at
 `
 
 type CreateUserParams struct {
@@ -42,6 +42,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.PhoneNumber,
 		&i.PasswordHash,
 		&i.Role,
+		&i.IsEmailVerified,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -49,7 +50,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id, full_name, email, phone_number, password_hash, role, created_at, updated_at FROM users
+SELECT id, full_name, email, phone_number, password_hash, role, is_email_verified, created_at, updated_at FROM users
 WHERE id = $1 LIMIT 1
 `
 
@@ -63,6 +64,7 @@ func (q *Queries) GetUser(ctx context.Context, id int32) (User, error) {
 		&i.PhoneNumber,
 		&i.PasswordHash,
 		&i.Role,
+		&i.IsEmailVerified,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -70,7 +72,7 @@ func (q *Queries) GetUser(ctx context.Context, id int32) (User, error) {
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, full_name, email, phone_number, password_hash, role, created_at, updated_at FROM users
+SELECT id, full_name, email, phone_number, password_hash, role, is_email_verified, created_at, updated_at FROM users
 WHERE email = $1 LIMIT 1
 `
 
@@ -84,6 +86,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.PhoneNumber,
 		&i.PasswordHash,
 		&i.Role,
+		&i.IsEmailVerified,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

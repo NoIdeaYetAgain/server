@@ -6,6 +6,7 @@ CREATE TABLE users (
                        phone_number VARCHAR(20) NOT NULL,
                        password_hash TEXT NOT NULL,
                        role VARCHAR(20) CHECK (role IN ('student', 'agent', 'admin')) NOT NULL,
+                       is_email_verified BOOLEAN NOT NULL DEFAULT false,
                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -61,4 +62,15 @@ CREATE TABLE sessions (
                        is_blocked BOOLEAN NOT NULL DEFAULT FALSE,
                        expires_at TIMESTAMP NOT NULL,
                        created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Verify Email Table
+CREATE TABLE verify_emails (
+                               id BIGSERIAL PRIMARY KEY,
+                               user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                               email TEXT NOT NULL,
+                               token TEXT NOT NULL,
+                               is_used BOOLEAN NOT NULL DEFAULT false,
+                               expires_at TIMESTAMP NOT NULL DEFAULT (NOW() + interval '15 minutes'),
+                               created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );

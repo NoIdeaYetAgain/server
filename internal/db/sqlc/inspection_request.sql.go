@@ -71,18 +71,32 @@ func (q *Queries) GetInspectionRequest(ctx context.Context, id int32) (Inspectio
 
 const listInspections = `-- name: ListInspections :many
 SELECT id, property_id, student_id, status, requested_date, created_at FROM inspection_requests
-ORDER BY created_at DESC
+WHERE
+    (NOT $3::boolean OR student_id = $4)
+  AND (CASE WHEN $5::boolean THEN status = ANY($6::text[]) ELSE TRUE END)
+ORDER BY id DESC
     LIMIT $1
 OFFSET $2
 `
 
 type ListInspectionsParams struct {
-	Limit  int32 `json:"limit"`
-	Offset int32 `json:"offset"`
+	Limit     int32    `json:"limit"`
+	Offset    int32    `json:"offset"`
+	Column3   bool     `json:"column_3"`
+	StudentID int32    `json:"student_id"`
+	Column5   bool     `json:"column_5"`
+	Column6   []string `json:"column_6"`
 }
 
 func (q *Queries) ListInspections(ctx context.Context, arg ListInspectionsParams) ([]InspectionRequest, error) {
-	rows, err := q.db.Query(ctx, listInspections, arg.Limit, arg.Offset)
+	rows, err := q.db.Query(ctx, listInspections,
+		arg.Limit,
+		arg.Offset,
+		arg.Column3,
+		arg.StudentID,
+		arg.Column5,
+		arg.Column6,
+	)
 	if err != nil {
 		return nil, err
 	}

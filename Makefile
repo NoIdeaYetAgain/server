@@ -1,4 +1,4 @@
-.PHONY: postgres createdb dropdb sqlc test server
+.PHONY: postgres createdb dropdb sqlc test server redis
 
 postgres:
 	docker run -d --name clove \
@@ -21,3 +21,6 @@ test:
 
 server:
 	go run main.go
+
+redis:
+	 docker run --name redis -p 6379:6379 -d redis:8-alpine

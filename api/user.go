@@ -2,8 +2,11 @@ package api
 
 import (
 	db "clove/internal/db/sqlc"
+	"clove/token"
 	"clove/util"
+	"clove/worker"
 	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -47,6 +50,14 @@ func (server *Server) createUser(ctx *gin.Context) {
 		return
 	}
 
+	// Check if email already exists
+	_, err := server.store.GetUserByEmail(ctx, req.Email)
+	if err == nil {
+		// User with this email already exists
+		ctx.JSON(http.StatusConflict, errorResponse(fmt.Errorf("email already in use")))
+		return
+	}
+
 	hashedPassword, err := util.HashPassword(req.Password)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
@@ -62,6 +73,15 @@ func (server *Server) createUser(ctx *gin.Context) {
 	}
 
 	user, err := server.store.CreateUser(ctx, arg)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	taskPayload := &worker.PayloadSendVerifyEmail{
+		Email: user.Email,
+	}
+	err = server.taskDistributor.DistributeTaskSendVerifyEmail(ctx, taskPayload)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
@@ -185,4 +205,147 @@ func (server *Server) loginUser(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, rsp)
 
+}
+
+func (server *Server) getCurrentUser(ctx *gin.Context) {
+	authPayload := ctx.MustGet(authorizationPayloadKey).(*token.Payload)
+	user, err := server.store.GetUser(ctx, authPayload.UserID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			ctx.JSON(http.StatusNotFound, errorResponse(err))
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	ctx.JSON(http.StatusOK, newUserResponse(user))
+}
+
+type updateUserRequest struct {
+	ID          int32   `uri:"id" binding:"required,min=1"`
+	FullName    *string `json:"full_name,omitempty"`
+	Email       *string `json:"email,omitempty" binding:"omitempty,email"`
+	PhoneNumber *string `json:"phone_number,omitempty"`
+	Password    *string `json:"password,omitempty" binding:"omitempty,min=6"`
+}
+
+func (server *Server) updateUser(ctx *gin.Context) {
+	var req updateUserRequest
+	if err := ctx.ShouldBindUri(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		return
+	}
+
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		return
+	}
+
+	// Get existing user
+	existingUser, err := server.store.GetUser(ctx, req.ID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			ctx.JSON(http.StatusNotFound, errorResponse(err))
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	// Prepare update parameters
+	arg := db.UpdateUserParams{
+		ID:          req.ID,
+		FullName:    existingUser.FullName,
+		Email:       existingUser.Email,
+		PhoneNumber: existingUser.PhoneNumber,
+	}
+
+	// Apply updates from request
+	if req.FullName != nil {
+		arg.FullName = *req.FullName
+	}
+	if req.Email != nil {
+		arg.Email = *req.Email
+	}
+	if req.PhoneNumber != nil {
+		arg.PhoneNumber = *req.PhoneNumber
+	}
+	if req.Password != nil {
+		hashedPassword, err := util.HashPassword(*req.Password)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+			return
+		}
+		arg.PasswordHash = hashedPassword
+	} else {
+		arg.PasswordHash = existingUser.PasswordHash
+	}
+
+	err = server.store.UpdateUser(ctx, arg)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"message": "user updated successfully"})
+}
+
+func (server *Server) updateCurrentUser(ctx *gin.Context) {
+	var req updateUserRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		return
+	}
+
+	authPayload := ctx.MustGet(authorizationPayloadKey).(*token.Payload)
+	req.ID = authPayload.UserID // Force update to current user
+
+	// Get existing user
+	existingUser, err := server.store.GetUser(ctx, req.ID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			ctx.JSON(http.StatusNotFound, errorResponse(err))
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	// Prepare update parameters
+	arg := db.UpdateUserParams{
+		ID:          req.ID,
+		FullName:    existingUser.FullName,
+		Email:       existingUser.Email,
+		PhoneNumber: existingUser.PhoneNumber,
+	}
+
+	// Apply updates from request
+	if req.FullName != nil {
+		arg.FullName = *req.FullName
+	}
+	if req.Email != nil {
+		arg.Email = *req.Email
+	}
+	if req.PhoneNumber != nil {
+		arg.PhoneNumber = *req.PhoneNumber
+	}
+	if req.Password != nil {
+		hashedPassword, err := util.HashPassword(*req.Password)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+			return
+		}
+		arg.PasswordHash = hashedPassword
+	} else {
+		arg.PasswordHash = existingUser.PasswordHash
+	}
+
+	err = server.store.UpdateUser(ctx, arg)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"message": "user updated successfully"})
 }

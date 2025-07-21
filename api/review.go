@@ -2,6 +2,7 @@ package api
 
 import (
 	db "clove/internal/db/sqlc"
+	"clove/token"
 	"errors"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -22,8 +23,10 @@ func (server *Server) createReview(ctx *gin.Context) {
 		return
 	}
 
+	authPayload := ctx.MustGet(authorizationPayloadKey).(*token.Payload)
+
 	arg := db.CreateReviewParams{
-		StudentID: req.StudentID,
+		StudentID: authPayload.UserID,
 		Rating:    pgtype.Int4{Int32: req.Rating, Valid: true},
 		Comment:   pgtype.Text{String: req.Comment, Valid: true},
 	}
@@ -96,19 +99,17 @@ type updateReviewRequest struct {
 func (server *Server) updateReview(ctx *gin.Context) {
 	var req updateReviewRequest
 
-	// Bind URI parameter
 	if err := ctx.ShouldBindUri(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, errorResponse(err))
 		return
 	}
 
-	// Bind JSON body
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, errorResponse(err))
 		return
 	}
 
-	// Check if review exists first
+	authPayload := ctx.MustGet(authorizationPayloadKey).(*token.Payload)
 	existingReview, err := server.store.GetReviewByID(ctx, req.ID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -119,26 +120,50 @@ func (server *Server) updateReview(ctx *gin.Context) {
 		return
 	}
 
-	// Prepare update parameters - use existing values if not provided
-	arg := db.UpdateReviewParams{
-		ID: req.ID,
+	// Authorization check - only owner or admin can update
+	if authPayload.Role != "admin" && existingReview.StudentID != authPayload.UserID {
+		ctx.JSON(http.StatusForbidden,
+			errorResponse(errors.New("can only update your own reviews")))
+		return
 	}
 
-	// Update rating if provided, otherwise keep existing
+	// Prepare update parameters
+	arg := db.UpdateReviewParams{
+		ID:      req.ID,
+		Rating:  existingReview.Rating,
+		Comment: existingReview.Comment,
+	}
+
+	// Apply updates from request
 	if req.Rating != nil {
 		arg.Rating = pgtype.Int4{Int32: *req.Rating, Valid: true}
-	} else {
-		arg.Rating = existingReview.Rating
 	}
-
-	// Update comment if provided, otherwise keep existing
 	if req.Comment != nil {
 		arg.Comment = pgtype.Text{String: *req.Comment, Valid: true}
-	} else {
-		arg.Comment = existingReview.Comment
 	}
 
 	review, err := server.store.UpdateReview(ctx, arg)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	ctx.JSON(http.StatusOK, review)
+}
+
+type deleteReviewRequest struct {
+	ID int32 `uri:"id" binding:"required,min=1"`
+}
+
+func (server *Server) deleteReview(ctx *gin.Context) {
+	var req deleteReviewRequest
+	if err := ctx.ShouldBindUri(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		return
+	}
+
+	authPayload := ctx.MustGet(authorizationPayloadKey).(*token.Payload)
+	review, err := server.store.GetReviewByID(ctx, req.ID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			ctx.JSON(http.StatusNotFound, errorResponse(err))
@@ -148,5 +173,18 @@ func (server *Server) updateReview(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, review)
+	// Only allow admin or review owner to delete
+	if authPayload.Role != "admin" && review.StudentID != authPayload.UserID {
+		ctx.JSON(http.StatusForbidden,
+			errorResponse(errors.New("only admin or review owner can delete reviews")))
+		return
+	}
+
+	err = server.store.DeleteReview(ctx, req.ID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"message": "review deleted successfully"})
 }

@@ -56,12 +56,23 @@ type Session struct {
 }
 
 type User struct {
-	ID           int32            `json:"id"`
-	FullName     string           `json:"full_name"`
-	Email        string           `json:"email"`
-	PhoneNumber  string           `json:"phone_number"`
-	PasswordHash string           `json:"password_hash"`
-	Role         string           `json:"role"`
-	CreatedAt    pgtype.Timestamp `json:"created_at"`
-	UpdatedAt    pgtype.Timestamp `json:"updated_at"`
+	ID              int32            `json:"id"`
+	FullName        string           `json:"full_name"`
+	Email           string           `json:"email"`
+	PhoneNumber     string           `json:"phone_number"`
+	PasswordHash    string           `json:"password_hash"`
+	Role            string           `json:"role"`
+	IsEmailVerified bool             `json:"is_email_verified"`
+	CreatedAt       pgtype.Timestamp `json:"created_at"`
+	UpdatedAt       pgtype.Timestamp `json:"updated_at"`
+}
+
+type VerifyEmail struct {
+	ID        int64            `json:"id"`
+	UserID    int32            `json:"user_id"`
+	Email     string           `json:"email"`
+	Token     string           `json:"token"`
+	IsUsed    bool             `json:"is_used"`
+	ExpiresAt pgtype.Timestamp `json:"expires_at"`
+	CreatedAt pgtype.Timestamp `json:"created_at"`
 }

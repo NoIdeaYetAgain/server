@@ -12,7 +12,10 @@ WHERE id = $1;
 
 -- name: ListInspections :many
 SELECT * FROM inspection_requests
-ORDER BY created_at DESC
+WHERE
+    (NOT $3::boolean OR student_id = $4)
+  AND (CASE WHEN $5::boolean THEN status = ANY($6::text[]) ELSE TRUE END)
+ORDER BY id DESC
     LIMIT $1
 OFFSET $2;
 

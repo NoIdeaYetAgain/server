@@ -18,6 +18,7 @@ type Querier interface {
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (Session, error)
 	CreateReview(ctx context.Context, arg CreateReviewParams) (Review, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	CreateVerifyEmail(ctx context.Context, arg CreateVerifyEmailParams) (VerifyEmail, error)
 	DeleteInspectionRequest(ctx context.Context, id int32) error
 	DeleteProperty(ctx context.Context, id int32) error
 	DeleteReview(ctx context.Context, id int32) error
